@@ -66,7 +66,40 @@ final class PostServiceTests: XCTestCase {
     // Then call fetchPosts and assert the error is that specific case - not
     // just that "some error" was thrown.
 
+    func test404NotFoundError() async {
+        let statusCode = 404
+        let body = Data()
+        let headers: [String: String] = [:]
+
+        FakeServer.response = { _ in (statusCode, body, headers) }
+
+        do {
+            _ = try await service.fetchPosts(page: 1, limit: 10)
+            XCTFail("expected an error")
+        } catch let error as APIError {
+            XCTAssertEqual(error, .notFound)
+        } catch {
+            XCTFail("Other error type: \(error)")
+        }
+    }
+
     // TODO: a 500 should throw APIError.badStatus(500).
+    func test500BadStatusError() async {
+        let statusCode = 500
+        let body = Data()
+        let headers: [String: String] = [:]
+
+        FakeServer.response = { _ in (statusCode, body, headers) }
+
+        do {
+            _ = try await service.fetchPosts(page: 1, limit: 10)
+            XCTFail("expected an error")
+        } catch let error as APIError {
+            XCTAssertEqual(error, .badStatus(500))
+        } catch {
+            XCTFail("Other error type: \(error)")
+        }
+    }
 
     // TODO: a 200 whose body is the wrong shape, for example
     //
@@ -74,6 +107,23 @@ final class PostServiceTests: XCTestCase {
     //
     // must throw APIError.decodingFailed. If this one comes back as a success,
     // your send(_:) is not checking anything.
+
+    func test200DecodingFailedError() async {
+        let statusCode = 200
+        let body = Data(#"{"nope": true}"#.utf8)
+        let headers: [String: String] = [:]
+
+        FakeServer.response = { _ in (statusCode, body, headers) }
+
+        do {
+            _ = try await service.fetchPosts(page: 1, limit: 10)
+            XCTFail("expected an error")
+        } catch let error as APIError {
+            XCTAssertEqual(error, .decodingFailed)
+        } catch {
+            XCTFail("Other error type: \(error)")
+        }
+    }
 
     // Tip: XCTAssertThrowsError does not work with async calls, so use
     // do/catch instead:

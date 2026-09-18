@@ -24,7 +24,12 @@ struct Post: Decodable, Equatable {
     let title: String
     let body: String
 
-    // TODO (Task 1): add a CodingKeys enum so authorID reads from "userId".
+    enum CodingKeys: String, CodingKey {
+        case id
+        case authorID = "userId"
+        case title
+        case body
+    }
 }
 
 /// What we send when creating a post. Encodable only: it never comes back.
@@ -34,7 +39,11 @@ struct NewPost: Encodable {
     let body: String
     let authorID: Int
 
-    // TODO (Task 1): the server expects "userId" here too.
+    enum CodingKeys: String, CodingKey {
+        case title
+        case body
+        case authorID = "userId"
+    }
 }
 
 /// One page of posts, plus how many exist in total. Nothing to change.
@@ -60,9 +69,42 @@ struct Author: Decodable, Equatable {
     let city: String
     let latitude: String
 
-    // TODO (Stretch):
-    //  1. one CodingKey enum per level - the keys differ at each level, so a
-    //     single enum cannot describe them all
-    //  2. init(from decoder: Decoder)
-    //  3. container.nestedContainer(keyedBy:forKey:) steps down one level
+    // Keys at the top level.
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case address
+    }
+
+    // Keys inside the "address" object.
+    enum AddressKeys: String, CodingKey {
+        case city
+        case geo
+    }
+
+    // Keys inside the "geo" object.
+    enum GeoKeys: String, CodingKey {
+        case lat
+    }
+
+    init(from decoder: Decoder) throws {
+        // Container for the top level object.
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // Decode values that exist at the top level.
+        id = try container.decode(Int.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+
+        // Step into the nested "address" object.
+        let addressContainer = try container.nestedContainer(keyedBy: AddressKeys.self, forKey: .address)
+
+        // Decode "city" from inside "address".
+        city = try addressContainer.decode(String.self, forKey: .city)
+
+        // Step into the nested "geo" object inside "address".
+        let geoContainer = try addressContainer.nestedContainer(keyedBy: GeoKeys.self, forKey: .geo)
+
+        // Decode "lat" from inside "geo".
+        latitude = try geoContainer.decode(String.self, forKey: .lat)
+    }
 }

@@ -38,7 +38,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         completionHandler: @escaping () -> Void
     ) {
         EventLog.shared.log("handleEventsForBackgroundURLSession")
-        // TODO (Task 5)
+        /*
+         Regarding the above questions:
+
+         No, it is not the right time to call the completion handler. Because firstly session should be created.
+         So we are storing it in backgroundCompletionHandler.
+         When we call BackgroundDownloader.shared the init() method runs which creates and stores the session.
+
+         By the time this method returns, the background session must already
+         exist. And that session is created in BackgroundDownloader.shared.init(),
+         and it stores "self" as the delegate. Without that session alive, the
+         system cannot route the later "urlSessionDidFinishEvents" callback back
+         to us. So we store the completion handler here and invoke it only when
+         the session has finished delivering its pending events.
+         */
+        BackgroundDownloader.shared.backgroundCompletionHandler = completionHandler
     }
 
     func application(
