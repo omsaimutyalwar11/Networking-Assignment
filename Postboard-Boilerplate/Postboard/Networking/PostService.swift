@@ -80,8 +80,35 @@ final class PostService: PostServiceProtocol {
     ///  4. decode [Post] from the data
     ///  5. Task 3: read "X-Total-Count" off the response for Page.totalCount
     func fetchPosts(page: Int, limit: Int) async throws -> Page {
-        // TODO (Tasks 2 and 3)
-        throw APIError.transport("fetchPosts is not written yet")
+        // Built the URL using URLComponents and queryItems.
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
+        components?.path = "/posts"
+        components?.queryItems = [
+            URLQueryItem(name: "_page", value: "\(page)"),
+            URLQueryItem(name: "_limit", value: "\(limit)")
+        ]
+
+        guard let url = components?.url else {
+            throw APIError.invalidURL
+        }
+
+        // Creating the URL request.
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        // Calling the send method.
+        let (data, response) = try await send(request)
+
+        // Calling the decode method.
+        let posts = try decode([Post].self, from: data)
+
+        // Extracting the X-Total-Count from header response.
+        let totalCount = Int(response.value(forHTTPHeaderField: "X-Total-Count") ?? "") ?? 0
+
+        return Page(
+            posts: posts,
+            totalCount: totalCount
+        )
     }
 
     // MARK: - Task 4: the POST
@@ -93,8 +120,14 @@ final class PostService: PostServiceProtocol {
     /// "application/json", encode the NewPost with JSONEncoder into httpBody,
     /// send it, and decode the Post that comes back.
     func createPost(_ post: NewPost) async throws -> Post {
-        // TODO (Task 4)
-        throw APIError.transport("createPost is not written yet")
+        var request = URLRequest(url: baseURL.appendingPathComponent("posts"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(post)
+
+        // The data after send operation. Also, excluded the response here since we are not using it.
+        let (data, _) = try await send(request)
+        return try decode(Post.self, from: data)
     }
 
     // MARK: - Shared plumbing
@@ -118,8 +151,32 @@ final class PostService: PostServiceProtocol {
     ///       404        ->  throw APIError.notFound
     ///       anything else -> throw APIError.badStatus(that code)
     private func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        // TODO (Task 2)
-        throw APIError.transport("send is not written yet")
+        do {
+            let (data, urlResponse) = try await session.data(for: request)
+
+            guard let http = urlResponse as? HTTPURLResponse else {
+                throw APIError.transport("invalid response")
+            }
+
+            switch http.statusCode {
+            case 200..<300:
+                return (data, http)
+            case 404:
+                throw APIError.notFound
+            default:
+                throw APIError.badStatus(http.statusCode)
+            }
+        } catch let urlError as URLError {
+            if urlError.code == .notConnectedToInternet {
+                throw APIError.offline
+            } else {
+                throw APIError.transport(urlError.localizedDescription)
+            }
+        } catch let apiError as APIError {
+            throw apiError
+        } catch {
+            throw APIError.transport(error.localizedDescription)
+        }
     }
 
     /// Turns the response body into whatever model you ask for, in one place,
@@ -135,7 +192,11 @@ final class PostService: PostServiceProtocol {
     ///  3. then throw APIError.decodingFailed, which is what the user sees.
     ///     Never put the raw decoding detail in front of a user.
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
-        // TODO (Task 2)
-        throw APIError.transport("decode is not written yet")
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch {
+            EventLog.shared.log("Decode error : \(error)")
+            throw APIError.decodingFailed
+        }
     }
 }

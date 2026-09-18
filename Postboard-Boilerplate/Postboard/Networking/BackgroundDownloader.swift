@@ -53,22 +53,31 @@ final class BackgroundDownloader: NSObject {
     private override init() {
         super.init()
 
-        // TODO (Task 5): build the background session and assign it to
-        // `session` above.
-        //
-        //  1. URLSessionConfiguration.background(withIdentifier: Self.identifier)
-        //     - a normal .default session dies when the app is suspended;
-        //       only a background one is handed to the system to finish
-        //
-        //  2. two settings on that configuration isDiscretionary, sessionSendsLaunchEvents and explain in the comment what these are.
-        //
-        //  3. URLSession(configuration:delegate:delegateQueue:) with `self` as
-        //     the delegate and nil for the queue. It must have a delegate: the
-        //     async and completion-handler APIs cannot work here, because when
-        //     the download finishes your app may not be running at all.
-        //
-        // Log something with EventLog.shared.log when you have built it, so you can see
-        // in the log when the session comes back to life after a relaunch.
+        // Created the URLSessionConfiguration using background session with the unique identifier.
+        let configuration = URLSessionConfiguration.background(withIdentifier: Self.identifier)
+
+        // Setting the isDiscretionary, sessionSendsLaunchEvents properties in configuration.
+        /*
+         isDiscretionary = false:
+         The system tries to start and continue the download as soon as possible without waiting for ideal conditions like Wi-Fi or charging.
+
+         isDiscretionary = true:
+         The system can delay the download and choose a better time to run it, based on conditions such as network availability or charging.
+
+         sessionSendsLaunchEvents = true:
+         Allows iOS to launch the app in the background when there are events to deliver from the background URLSession, such as when a download finishes.
+
+         sessionSendsLaunchEvents = false:
+         iOS does not launch the app in the background just to deliver events from the background URLSession.
+         */
+        configuration.isDiscretionary = false
+        configuration.sessionSendsLaunchEvents = true
+
+        // Created a URLSession and assigned it to the session property.
+        self.session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+
+        // Printing the EventLog.
+        EventLog.shared.log("Entered into the init of BackgroundDownloader class.")
     }
 
     /// Starts the download.
@@ -82,8 +91,13 @@ final class BackgroundDownloader: NSObject {
     /// Steps: make a download task for Self.fileURL, set taskDescription,
     /// resume it, and log that you did.
     func startDownload() {
-        // TODO (Task 5)
-        EventLog.shared.log("startDownload is not written yet")
+        // Created a download task.
+        let task = session.downloadTask(with: Self.fileURL)
+
+        // Set the Self.savedFileName to the taskDescription.
+        task.taskDescription = Self.savedFileName
+        task.resume()
+        EventLog.shared.log("startDownload is running.")
     }
 
     /// GIVEN - moves the finished file out of its temporary location into
@@ -155,6 +169,9 @@ extension BackgroundDownloader: URLSessionDownloadDelegate {
     /// system treat your app as unresponsive.
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         EventLog.shared.log("urlSessionDidFinishEvents")
-        // TODO: Add implementation
+        DispatchQueue.main.async {
+            self.backgroundCompletionHandler?()
+            self.backgroundCompletionHandler = nil
+        }
     }
 }
